@@ -98,14 +98,7 @@
   (cepl:repl width height 3.3)
   (gl:viewport 0 0 width height)
   (gl:disable :cull-face)
-  (gl:disable :depth-test)
-  (format t "Making new keymap~%")
-  (setf (xkb-context backend) (xkb-context-new 0))
-  (setf (keymap backend) (new-keymap-from-names (xkb-context backend) "evdev" "chromebook" "us" "" ""))
-  (format t "Making new state~%")
-  (setf (state backend) (xkb-state-new (keymap backend)))
-;;  (setf (keysym-to-keycode backend) (make-keysym-to-keycode-table (keymap backend) (state backend)))
-  )
+  (gl:disable :depth-test))
 
 (defmacro with-event-handlers (&body event-handlers)
   ;; Using poll here
@@ -141,52 +134,39 @@
 
 (defmethod process-events ((backend backend-sdl))
   (with-event-handlers
-    (:mousemotion (:x x :y y)
-		  (funcall (mouse-motion-handler backend) x y))
+    (:mousemotion (:x x :y y :xrel dx :yrel dy)
+		  (funcall (mouse-motion-handler backend) (get-internal-real-time) dx dy))
     (:mousebuttondown (:button button :state state :x x :y y)
-		      (funcall (mouse-button-handler backend) (sdl-to-evdev button) state))
+		      (funcall (mouse-button-handler backend) (get-internal-real-time) (sdl-to-evdev button) state))
     (:mousebuttonup (:button button :state state :x x :y y)
-		    (funcall (mouse-button-handler backend) (sdl-to-evdev button) state))
+		    (funcall (mouse-button-handler backend) (get-internal-real-time) (sdl-to-evdev button) state))
     (:keydown (:keysym keysym)
 	      (let ((scancode (sdl-to-linux-scancode (sdl2:scancode-value keysym))))
-		(xkb:xkb-state-update-key (state backend) scancode 1) ;; XKB_KEY_DOWN
-		     (let ((modifier-state (list
-					    (xkb:xkb-state-serialize-mods (state backend) 1)
-					    (xkb:xkb-state-serialize-mods (state backend) 2)
-					    (xkb:xkb-state-serialize-mods (state backend) 4)
-					    (xkb:xkb-state-serialize-layout (state backend) 64))))
-		       (if (>= scancode 8)
-			   (funcall (keyboard-handler backend)
-				    (- scancode 8)
-				    1
-				    (when (not (equalp modifier-state (modifier-state backend)))
-				      (setf (modifier-state backend) modifier-state)))
-			 (format t "Scancode less than 8: ~A, ~A ~%" scancode keysym)))))
+		(if (>= scancode 8)
+		    (funcall (keyboard-handler backend)
+			     (get-internal-real-time)
+			     (- scancode 8)
+			     1))))
     (:keyup (:keysym keysym)
 	      (let ((scancode (sdl-to-linux-scancode (sdl2:scancode-value keysym))))
-		(xkb:xkb-state-update-key (state backend) scancode 0) ;; XKB_KEY_UP
-		   (let ((modifier-state (list
-					  (xkb:xkb-state-serialize-mods (state backend) 1)
-					  (xkb:xkb-state-serialize-mods (state backend) 2)
-					  (xkb:xkb-state-serialize-mods (state backend) 4)
-					  (xkb:xkb-state-serialize-layout (state backend) 64))))
-		     (if (>= scancode 8)
-			 (funcall (keyboard-handler backend)
-				  (- scancode 8)
-				  0
-				  (when (not (equalp modifier-state (modifier-state backend)))
-				    (setf (modifier-state backend) modifier-state)))
-			 (format t "Scancode less than 8: ~A, ~A ~%" scancode keysym)))))
+		(if (>= scancode 8)
+		    (funcall (keyboard-handler backend)
+			     (get-internal-real-time)
+			     (- scancode 8)
+			     0))))
     (:windowevent (:type type :data1 data1 :data2 data2)
+		  #|
 		  (xkb:xkb-state-unref (state backend))
 		  (setf (state backend) (xkb-state-new (keymap backend)))
 		  (funcall (keyboard-handler backend)
+			   (get-internal-real-time)
 			   nil
 			   nil (list
 				(xkb:xkb-state-serialize-mods (state backend) 1)
 				(xkb:xkb-state-serialize-mods (state backend) 2)
 				(xkb:xkb-state-serialize-mods (state backend) 4)
 				(xkb:xkb-state-serialize-layout (state backend) 64)))
+		  |#
 		  (funcall (window-event-handler backend)))))
 
 ;; Bother with these methods or just setf?
@@ -201,49 +181,6 @@
 
 (defmethod register-window-event-handler ((backend backend-sdl) window-event-handler)
   (setf (window-event-handler backend) window-event-handler))
-
-(defmethod get-keymap ((backend backend-sdl))
-  (format t "Getting keymap~%")
-  (let* ((string (xkb-keymap-get-as-string (keymap backend) 1)) ;; 1 == XKB_KEYMAP_FORMAT_TEXT_V!
-	 (size (+ (length string) 1))
-	 (xdg-runtime-dir (sb-posix:getenv "XDG_RUNTIME_DIR")))
-    (multiple-value-bind (fd name) (sb-posix:mkstemp (concatenate 'string xdg-runtime-dir "/XXXXXXXX"))
-      (sb-posix:ftruncate fd size)
-      (let ((map (sb-posix:mmap nil size (logxor sb-posix:prot-read sb-posix:prot-write) sb-posix:map-shared fd 0)))
-	(lisp-string-to-foreign string map size)
-	(sb-posix:munmap map size)
-	(values fd size)))))
-
-
-#|
-(defmethod render ((backend backend-sdl) (compositor ulubis-compositor:compositor))
-  (let* ((renderer (renderer backend))
-	 (clients (reverse (ulubis-compositor:clients compositor))))
-    ;; In future don't clear the whole screen
-    ;; Simply overwrite damanged rectangles
-    (sdl2:set-render-draw-color renderer 50 50 50 255)
-    (sdl2:render-clear renderer)
-    
-    (loop :for client :in clients
-       :do (when (ulubis-client:texture client)
-	     (let* ((x (ulubis-client:x client))
-		    (y (ulubis-client:y client))
-		    (texture (ulubis-client:texture client))
-		    (width (width texture))
-		    (height (height texture))
-		    (rect (sdl2:make-rect x y width height)))
-	       (sdl2:render-copy renderer
-				 (->texture texture)
-				 :dest-rect rect)
-	       (sdl2:free-rect rect)
-	       (when (ulubis-client:->frame-callback client)
-		 (wl-callback-send-done (ulubis-client:->frame-callback client) (get-internal-real-time))
-		 (wl-resource-destroy (ulubis-client:->frame-callback client))
-		 (setf (ulubis-client:->frame-callback client) nil)))))
-
-    (sdl2:render-present renderer)
-    (setf (ulubis-compositor:render-needed compositor) nil)))
-|#
 
 (defmethod swap-buffers ((backend backend-sdl))
   (cepl:swap))

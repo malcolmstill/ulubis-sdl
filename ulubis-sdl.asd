@@ -7,6 +7,6 @@
   :depends-on (#:cffi
                #:cepl.sdl2)
   :serial t
-  :components ((:file "package")
+  :components (;;(:file "package")
                (:file "ulubis-sdl")))
 
