@@ -94,7 +94,7 @@
     (230 (+ 100))
     (otherwise 8)))
 
-(defmethod initialise-backend ((backend backend-sdl) width height)
+(defmethod initialise-backend ((backend backend-sdl) width height devices)
   (cepl:repl width height 3.3)
   (gl:viewport 0 0 width height)
   (gl:disable :cull-face)
