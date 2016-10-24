@@ -1,9 +1,9 @@
 
-(in-package :ulubis-backend)
+(in-package :ulubis-sdl)
 
-(defparameter backend-name 'backend-sdl)
+(setf ulubis-backend:backend-name (intern "backend-sdl" :ulubis-backend))
 
-(defclass backend-sdl ()
+(defclass ulubis-backend:backend () ;; backend ()
   ((window :accessor window :initarg :window :initform nil)
    (counter :accessor counter :initarg :counter :initform 0)
    (mouse-button-handler :accessor mouse-button-handler :initarg :mouse-button-handler :initform (lambda (button state x y)))
@@ -94,7 +94,9 @@
     (230 (+ 100))
     (otherwise 8)))
 
-(defmethod initialise-backend ((backend backend-sdl) width height devices)
+(defmethod ulubis-backend:initialise-backend ((backend backend) width height devices)
+  #+sbcl
+  (sb-ext:disable-debugger)
   (cepl:repl width height 3.3)
   (gl:viewport 0 0 width height)
   (gl:disable :cull-face)
@@ -132,7 +134,7 @@
     ((= button 3) #x111)
     (t 0)))
 
-(defmethod process-events ((backend backend-sdl))
+(defmethod ulubis-backend:process-events ((backend backend))
   (with-event-handlers
     (:mousemotion (:x x :y y :xrel dx :yrel dy)
 		  (funcall (mouse-motion-handler backend) (get-internal-real-time) dx dy))
@@ -170,20 +172,20 @@
 		  (funcall (window-event-handler backend)))))
 
 ;; Bother with these methods or just setf?
-(defmethod register-keyboard-handler ((backend backend-sdl) keyboard-handler)
+(defmethod ulubis-backend:register-keyboard-handler ((backend backend) keyboard-handler)
   (setf (keyboard-handler backend) keyboard-handler))
 
-(defmethod register-mouse-motion-handler ((backend backend-sdl) mouse-motion-handler)
+(defmethod ulubis-backend:register-mouse-motion-handler ((backend backend) mouse-motion-handler)
   (setf (mouse-motion-handler backend) mouse-motion-handler))
 
-(defmethod register-mouse-button-handler ((backend backend-sdl) mouse-button-handler)
+(defmethod ulubis-backend:register-mouse-button-handler ((backend backend) mouse-button-handler)
   (setf (mouse-button-handler backend) mouse-button-handler))
 
-(defmethod register-window-event-handler ((backend backend-sdl) window-event-handler)
+(defmethod ulubis-backend:register-window-event-handler ((backend backend) window-event-handler)
   (setf (window-event-handler backend) window-event-handler))
 
-(defmethod swap-buffers ((backend backend-sdl))
+(defmethod ulubis-backend:swap-buffers ((backend backend))
   (cepl:swap))
 
-(defmethod destroy-backend ((backend backend-sdl))
+(defmethod ulubis-backend:destroy-backend ((backend backend))
   (cepl:quit))

@@ -5,8 +5,9 @@
   :author "Malcolm Still"
   :license "BSD 3-Clause"
   :depends-on (#:cffi
-               #:cepl.sdl2)
+               #:cepl.sdl2
+	       #:ulubis)
   :serial t
-  :components (;;(:file "package")
+  :components ((:file "package")
                (:file "ulubis-sdl")))
 
