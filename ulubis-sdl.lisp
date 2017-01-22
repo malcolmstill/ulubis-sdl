@@ -95,8 +95,6 @@
     (otherwise 8)))
 
 (defmethod ulubis-backend:initialise-backend ((backend backend) width height devices)
-  #+sbcl
-  (sb-ext:disable-debugger)
   (cepl:repl width height 3.3)
   (sdl2:set-relative-mouse-mode 1)
   (gl:viewport 0 0 width height)
