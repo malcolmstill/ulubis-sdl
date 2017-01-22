@@ -98,6 +98,7 @@
   #+sbcl
   (sb-ext:disable-debugger)
   (cepl:repl width height 3.3)
+  (sdl2:set-relative-mouse-mode 1)
   (gl:viewport 0 0 width height)
   (gl:disable :cull-face)
   (gl:disable :depth-test))
@@ -144,6 +145,7 @@
 		    (funcall (mouse-button-handler backend) (get-internal-real-time) (sdl-to-evdev button) state))
     (:keydown (:keysym keysym)
 	      (let ((scancode (sdl-to-linux-scancode (sdl2:scancode-value keysym))))
+		(format t "Key down: ~A~%" scancode)
 		(if (>= scancode 8)
 		    (funcall (keyboard-handler backend)
 			     (get-internal-real-time)
@@ -157,18 +159,6 @@
 			     (- scancode 8)
 			     0))))
     (:windowevent (:type type :data1 data1 :data2 data2)
-		  #|
-		  (xkb:xkb-state-unref (state backend))
-		  (setf (state backend) (xkb-state-new (keymap backend)))
-		  (funcall (keyboard-handler backend)
-			   (get-internal-real-time)
-			   nil
-			   nil (list
-				(xkb:xkb-state-serialize-mods (state backend) 1)
-				(xkb:xkb-state-serialize-mods (state backend) 2)
-				(xkb:xkb-state-serialize-mods (state backend) 4)
-				(xkb:xkb-state-serialize-layout (state backend) 64)))
-		  |#
 		  (funcall (window-event-handler backend)))))
 
 ;; Bother with these methods or just setf?
