@@ -6,9 +6,12 @@
 (defclass ulubis-backend:backend () ;; backend ()
   ((window :accessor window :initarg :window :initform nil)
    (counter :accessor counter :initarg :counter :initform 0)
-   (mouse-button-handler :accessor mouse-button-handler :initarg :mouse-button-handler :initform (lambda (button state x y)))
-   (mouse-motion-handler :accessor mouse-motion-handler :initarg :mouse-motion-handler :initform (lambda (x y xrel yrel state)))
-   (keyboard-handler :accessor keyboard-handler :initarg :keyboard-handler :initform (lambda (key state)))
+   (mouse-button-handler :accessor mouse-button-handler :initarg :mouse-button-handler
+                         :initform (lambda (button state x y) (declare (ignore button state x y))))
+   (mouse-motion-handler :accessor mouse-motion-handler :initarg :mouse-motion-handler
+                         :initform (lambda (x y xrel yrel state) (declare (ignore x y xrel yrel state))))
+   (keyboard-handler :accessor keyboard-handler :initarg :keyboard-handler
+                     :initform (lambda (key state) (declare (ignore key state))))
    (window-event-handler :accessor window-event-handler :initarg :window-event-handler :initform (lambda ()))
    ;; xkb
    (xkb-context :accessor xkb-context :initarg :xkb-context :initform nil)
@@ -19,7 +22,7 @@
 
 (defun make-keysym-to-keycode-table (keymap state)
   (let ((table (make-hash-table)))
-    (loop :for i :from (xkb-keymap-min-keycode keymap) :to (xkb-keymap-max-keycode keymap)
+    (loop :for i :from (xkb:xkb-keymap-min-keycode keymap) :to (xkb:xkb-keymap-max-keycode keymap)
        :do (let ((keysym (xkb:xkb-state-key-get-one-sym state i)))
 	     (format t "Kesym: ~A, keycode: ~A, name: ~A~%" keysym i (xkb:get-keysym-name keysym))
 	     (setf (gethash keysym table) i)))
@@ -136,10 +139,13 @@
 (defmethod ulubis-backend:process-events ((backend backend))
   (with-event-handlers
     (:mousemotion (:x x :y y :xrel dx :yrel dy)
+                  (declare (ignore x y))
 		  (funcall (mouse-motion-handler backend) (get-internal-real-time) dx dy))
     (:mousebuttondown (:button button :state state :x x :y y)
+                      (declare (ignore x y))
 		      (funcall (mouse-button-handler backend) (get-internal-real-time) (sdl-to-evdev button) state))
     (:mousebuttonup (:button button :state state :x x :y y)
+                    (declare (ignore x y))
 		    (funcall (mouse-button-handler backend) (get-internal-real-time) (sdl-to-evdev button) state))
     (:keydown (:keysym keysym)
 	      (let ((scancode (sdl-to-linux-scancode (sdl2:scancode-value keysym))))
@@ -157,6 +163,7 @@
 			     (- scancode 8)
 			     0))))
     (:windowevent (:type type :data1 data1 :data2 data2)
+                  (declare (ignore type data1 data2))
 		  (funcall (window-event-handler backend)))))
 
 ;; Bother with these methods or just setf?
