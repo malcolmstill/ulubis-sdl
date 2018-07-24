@@ -184,3 +184,18 @@
 
 (defmethod ulubis-backend:destroy-backend ((backend backend))
   (cepl:quit))
+
+(defmethod ulubis-backend:init-egl ((backend backend) wl-display)
+  nil)
+
+(defmethod ulubis-backend:egl-supported? ((backend backend))
+  nil)
+
+(defmethod ulubis-backend:egl-surface? ((backend backend) buffer)
+  nil)
+
+(defmethod ulubis-backend:egl-get-dimensions ((backend backend) buffer)
+  nil)
+
+(defmethod ulubis-backend:egl-texture-from-image ((backend backend) buffer width height)
+  nil)
